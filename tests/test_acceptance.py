@@ -43,8 +43,15 @@ from .test__compiler import render
 
 class TestAcceptance(TestCase):
 
-    def assertRender(self, template, context, result, helpers=None, partials=None, **kwargs):
-        self.assertEqual(result, render(template, context, helpers=helpers, partials=partials, **kwargs))
+    def assertRender(self, template, context, result, helpers=None, partials=None, error=None, **kwargs):
+        try:
+            self.assertEqual(result, render(template, context, helpers=helpers, partials=partials, **kwargs))
+        except PybarsError, e:
+            self.assertEqual(e.message, error)
+        else:
+            if error:
+                self.assertTrue(False, "Was expecting an error: {}".format(error))
+
 
     def test_basic_context(self):
         template = u"Goodbye\n{{cruel}}\n{{world}}!"
@@ -2056,9 +2063,26 @@ class TestAcceptance(TestCase):
     def test_invalid_python_identifiers_cannot_be_used_as_keyword_arguments(self):
         template = u'{{foo 0x="bar"}}'
         context = {}
-        result = ''
+        result = None
+        error = 'Error at character 7 of line 1 near 0x="bar"}}'
 
-        self.assertRender(template, context, result)
+        self.assertRender(template, context, result, error=error)
+
+    def test_invalid_closing_tags(self):
+        template = u'{{#foo}}{{/#foo}}'
+        context = {}
+        result = None
+        error = 'Error at character 11 of line 1 near {{/#foo}}'
+
+        self.assertRender(template, context, result, error=error)
+
+    def test_missing_bracket(self):
+        template = u'{{foo}'
+        context = {}
+        result = None
+        error = 'Error at character 5 of line 1 near {{foo}'
+
+        self.assertRender(template, context, result, error=error)
 
     def test_backslash_does_not_normally_escape_text(self):
         helpers = {
